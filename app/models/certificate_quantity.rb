@@ -11,4 +11,10 @@ class CertificateQuantity < ApplicationRecord
   def retire
     update(status: "retired")
   end
+
+  def cancel_transfer!
+    return unless status == "intransit"
+    
+    update!(status: "active", to_organization: nil, intransit_at: nil)
+  end
 end
