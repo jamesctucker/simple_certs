@@ -10,6 +10,6 @@ production:
 
 development:
   cancel_stale_transfers:
-  class: CancelStaleTransfersJob
-  queue: default
-  schedule: every 5 minutes
+    class: CancelStaleTransfersJob
+    queue: default
+    schedule: every 5 minutes

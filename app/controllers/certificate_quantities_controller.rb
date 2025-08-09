@@ -74,7 +74,7 @@ class CertificateQuantitiesController < ApplicationController
       return head :unprocessable_entity
     end
 
-    @certificate_quantity.update(status: "active", to_organization: nil, intransit_at: nil)
+    @certificate_quantity.cancel_transfer!
 
     render "show"
   end
