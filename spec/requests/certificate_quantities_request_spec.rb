@@ -38,9 +38,13 @@ RSpec.describe 'CertificateQuantities', type: :request do
       'certificate_id' => certificate_quantity.certificate_id,
       'account_id' => certificate_quantity.account_id,
       'status' => certificate_quantity.status
-
     }
-    json.merge!({ 'to_organization_id' => certificate_quantity.to_organization_id }) if certificate_quantity.status == 'intransit'
+    if certificate_quantity.status == 'intransit'
+      json.merge!({
+        'to_organization_id' => certificate_quantity.to_organization_id,
+        'intransit_at' => certificate_quantity.intransit_at&.as_json
+      })
+    end
     json
   end
 

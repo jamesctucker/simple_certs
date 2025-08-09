@@ -17,4 +17,10 @@ class CertificateQuantity < ApplicationRecord
     
     update!(status: "active", to_organization: nil, intransit_at: nil)
   end
+
+  def accept_transfer!(recipient_account)
+    return unless status == "intransit"
+    
+    update!(status: "active", to_organization: nil, account: recipient_account, intransit_at: nil)
+  end
 end

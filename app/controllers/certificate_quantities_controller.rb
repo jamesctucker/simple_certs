@@ -60,7 +60,7 @@ class CertificateQuantitiesController < ApplicationController
       @certificate_quantity.update(account: account)
     elsif organization_id
       organization = Organization.find(organization_id)
-      @certificate_quantity.update(status: "intransit", to_organization: organization, intransit_at: Time.now)
+      @certificate_quantity.update(status: "intransit", to_organization: organization, intransit_at: Time.current)
     end
 
     render "show"
@@ -87,7 +87,7 @@ class CertificateQuantitiesController < ApplicationController
       return head :unprocessable_entity
     end
 
-    @certificate_quantity.update(status: "active", to_organization: nil, account: current_user.organization.default_account, intransit_at: nil)
+    @certificate_quantity.accept_transfer!(current_user.organization.default_account)
 
     render "show"
   end

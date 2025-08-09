@@ -2,11 +2,10 @@ class CancelStaleTransfersJob < ApplicationJob
   queue_as :default
 
   def perform
-    stale_records = CertificateQuantity.where(status: "intransit").where("intransit_at < ?", stale_threshold)
-
-    count = stale_records.count
-    stale_records.find_each(&:cancel_transfer!)
-    Rails.logger.info "CancelStaleTransfersJob: Cancelled #{count} stale transfers"
+    stale_transfers = CertificateQuantity.where(status: "intransit").where("intransit_at < ?", stale_threshold)
+    ids = stale_transfers.pluck(:id)
+    stale_transfers.find_each(&:cancel_transfer!)
+    Rails.logger.info "CancelStaleTransfersJob: Cancelled #{ids.size} stale transfers (ids: #{ids.join(',')})"
   end
   # If cancel_transfer! raises an exception, ActiveJob will log it automatically
 
