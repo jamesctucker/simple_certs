@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_01_025252) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_09_192903) do
   create_table "accounts", force: :cascade do |t|
     t.string "name"
     t.integer "organization_id"
@@ -23,8 +23,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_01_025252) do
     t.integer "account_id"
     t.string "status"
     t.integer "to_organization_id"
+    t.datetime "intransit_at"
     t.index ["account_id"], name: "index_certificate_quantities_on_account_id"
     t.index ["certificate_id"], name: "index_certificate_quantities_on_certificate_id"
+    t.index ["intransit_at"], name: "index_certificate_quantities_on_intransit_at"
     t.index ["to_organization_id"], name: "index_certificate_quantities_on_to_organization_id"
   end
 

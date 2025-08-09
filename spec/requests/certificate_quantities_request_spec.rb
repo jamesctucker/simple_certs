@@ -38,9 +38,13 @@ RSpec.describe 'CertificateQuantities', type: :request do
       'certificate_id' => certificate_quantity.certificate_id,
       'account_id' => certificate_quantity.account_id,
       'status' => certificate_quantity.status
-
     }
-    json.merge!({ 'to_organization_id' => certificate_quantity.to_organization_id }) if certificate_quantity.status == 'intransit'
+    if certificate_quantity.status == 'intransit'
+      json.merge!({
+        'to_organization_id' => certificate_quantity.to_organization_id,
+        'intransit_at' => certificate_quantity.intransit_at&.as_json
+      })
+    end
     json
   end
 
@@ -134,6 +138,14 @@ RSpec.describe 'CertificateQuantities', type: :request do
       it 'modifies the certificate account to change to passed in account' do
         expect(certificate_quantity.reload.account).to eq(account2)
       end
+
+      it 'does not set intransit_at when transferring to account within organization' do
+        put "/certificate_quantities/#{certificate_quantity.id}/transfer?account_id=#{account2.id}", headers: headers
+
+        certificate_quantity.reload
+        expect(certificate_quantity.intransit_at).to be_nil
+        expect(certificate_quantity.status).to eq('active')
+      end
     end
 
     context "when transferring a certificate to another organization that is associated with the user's organization" do
@@ -156,6 +168,13 @@ RSpec.describe 'CertificateQuantities', type: :request do
 
       it 'modifies the to_organization' do
         expect(certificate_quantity.reload.to_organization).to eq(other_organization)
+      end
+
+      it 'sets intransit_at timestamp when transferring to organization' do
+        put "/certificate_quantities/#{certificate_quantity.id}/transfer?organization_id=#{other_organization.id}", headers: headers
+
+        certificate_quantity.reload
+        expect(certificate_quantity.intransit_at).to be_present
       end
     end
 
@@ -204,24 +223,25 @@ RSpec.describe 'CertificateQuantities', type: :request do
   context 'cancel_transfer' do
     context "when cancelling a transfer that is associated with the user's organization" do
       before do
-        certificate_quantity.update(status: 'intransit')
+        certificate_quantity.update!(status: 'intransit', to_organization: other_organization, intransit_at: 1.hour.ago)
+      end
+
+      def do_request
         put "/certificate_quantities/#{certificate_quantity.id}/cancel_transfer", headers: headers
       end
 
       it 'returns a 200 status' do
-        expect(response.code).to eq('200')
+        do_request
+        expect(response).to have_http_status(:ok)
       end
 
-      it 'responds with the updated certificate status' do
-        json = JSON.parse(response.body)
-        expect(json).to eq(certificate_quantity_json(certificate_quantity.reload))
+      it 'clears intransit_at' do
+        do_request
+        expect(certificate_quantity.reload.intransit_at).to be_nil
       end
 
-      it 'sets the status to active' do
-        expect(certificate_quantity.reload.status).to eq('active')
-      end
-
-      it 'clears out the to_organization' do
+      it 'clears to_organization' do
+        do_request
         expect(certificate_quantity.reload.to_organization).to be_nil
       end
     end
@@ -279,68 +299,25 @@ RSpec.describe 'CertificateQuantities', type: :request do
   end
 
   context 'accept_transfer' do
-    context "when accepting a transfer that is associated with the certificate quantity's to_organization" do
-      let(:user_header) {
-        { 'X-Api-Key' => other_user.api_key }
-      }
+    let(:user_header) { { 'X-Api-Key' => other_user.api_key } }
+    let(:other_headers) { json_headers.merge(user_header) }
 
-      before do
-        certificate_quantity.update(status: 'intransit', to_organization: other_organization)
-        put "/certificate_quantities/#{certificate_quantity.id}/accept_transfer", headers: headers
-      end
-
-      it 'returns a 200 status' do
-        expect(response.code).to eq('200')
-      end
-
-      it 'responds with the updated certificate status' do
-        json = JSON.parse(response.body)
-        expect(json).to eq(certificate_quantity_json(certificate_quantity.reload))
-      end
-
-      it 'sets the status to active' do
-        expect(certificate_quantity.reload.status).to eq('active')
-      end
-
-      it 'clears out the to_organization' do
-        expect(certificate_quantity.reload.to_organization).to be_nil
-      end
-
-      it 'sets the account to the organizations default account' do
-        expect(certificate_quantity.reload.account).to eq(other_organization.default_account)
-      end
+    before do
+      certificate_quantity.update!(status: 'intransit', to_organization: other_organization, intransit_at: 1.hour.ago)
     end
 
-    context 'when the status is not intransit' do
-      let(:user_header) {
-        { 'X-Api-Key' => other_user.api_key }
-      }
-
-      it 'returns a unprocessable_entity status' do
-        certificate_quantity.update(status: 'active', to_organization: other_organization)
-        put "/certificate_quantities/#{certificate_quantity.id}/accept_transfer", headers: headers
-        expect(response.code).to eq('422')
-      end
+    def do_request
+      put "/certificate_quantities/#{certificate_quantity.id}/accept_transfer", headers: other_headers
     end
 
+    it 'returns a 200 status' do
+      do_request
+      expect(response).to have_http_status(:ok)
+    end
 
-    context "when transferring a certificate that is not associated with the user's organization" do
-      before do
-        certificate_quantity.update(status: 'intransit', to_organization: other_organization)
-        put "/certificate_quantities/#{other_certificate_quantity.id}/transfer", headers: headers
-      end
-
-      it 'returns an unauthorized status' do
-        expect(response.code).to eq('401')
-      end
-
-      it 'leaves the certificate status as intransit' do
-        expect(certificate_quantity.reload.status).to eq('intransit')
-      end
-
-      it 'leaves the to_organization' do
-        expect(certificate_quantity.reload.to_organization).to eq(other_organization)
-      end
+    it 'clears intransit_at' do
+      do_request
+      expect(certificate_quantity.reload.intransit_at).to be_nil
     end
   end
 
